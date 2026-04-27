@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>膳食食谱 · 综合评价系统 | 基于熵权法的8项指标</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, 'Segoe UI', 'PingFang SC', Roboto, sans-serif; }
+    body { background: #f5f9f0; margin: 0; padding: 24px 20px; color: #1a2c1a; }
+    .container { max-width: 1600px; margin: 0 auto; }
+    .banner { background: #ffffffdd; backdrop-filter: blur(2px); border-radius: 28px; padding: 20px 28px; margin-bottom: 28px; border: 1px solid #d8e8d3; }
+    .badge { background: #2c5e2f; color: white; padding: 4px 14px; border-radius: 40px; font-size: 0.7rem; display: inline-block; margin-bottom: 12px; }
+    h1 { font-size: 1.9rem; margin: 0 0 8px; font-weight: 700; color: #1a3e1a; }
+    .sub { border-left: 4px solid #6f9e3e; padding-left: 16px; margin: 12px 0 0; font-size: 0.9rem; color: #476c3e; }
+    .weight-panel { background: white; border-radius: 32px; padding: 20px 26px; margin-bottom: 28px; box-shadow: 0 8px 18px rgba(0,0,0,0.05); border: 1px solid #e2efde; }
+    .weight-title { font-weight: 700; font-size: 1.1rem; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .slider-group { display: flex; flex-wrap: wrap; gap: 24px; justify-content: space-between; margin-top: 8px; }
+    .slider-item { flex: 1; min-width: 130px; }
+    .slider-item label { display: block; font-size: 0.75rem; font-weight: 600; color: #2c572c; margin-bottom: 4px; }
+    .slider-item input { width: 100%; cursor: pointer; accent-color: #4a8b3c; }
+    .weight-value { font-size: 0.7rem; color: #5f7c55; text-align: right; }
+    .norm-info { background: #ecf6e7; border-radius: 20px; padding: 6px 14px; font-size: 0.7rem; color: #2f582b; margin-top: 12px; }
+    .charts-row { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 32px; }
+    .chart-card { flex: 1; min-width: 280px; background: white; border-radius: 28px; padding: 16px 20px 20px; box-shadow: 0 6px 14px rgba(0,0,0,0.05); border: 1px solid #e0eedb; }
+    .chart-card h3 { margin: 0 0 12px; font-size: 1.1rem; font-weight: 600; color: #244d24; }
+    canvas { max-height: 320px; width: 100%; }
+    .table-wrapper { background: white; border-radius: 32px; overflow-x: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #e2efde; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 1000px; }
+    th { background: #eef5ea; padding: 14px 8px; font-weight: 700; color: #1c401c; border-bottom: 2px solid #cde0c6; text-align: center; }
+    td { padding: 12px 6px; border-bottom: 1px solid #e4f0df; text-align: center; }
+    .score-highlight { font-weight: 800; background: #e7f3df; border-radius: 24px; padding: 4px 8px; display: inline-block; }
+    .footnote { font-size: 0.7rem; text-align: center; color: #5b7553; padding: 16px 0; background: #fafef5; border-radius: 28px; margin-top: 16px; }
+    button { background: #2b5e2f; border: none; color: white; padding: 6px 16px; border-radius: 60px; font-size: 0.7rem; font-weight: 500; cursor: pointer; margin-left: 12px; }
+    button:hover { background: #1a421c; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="banner">
+    <div class="badge">📊 基于8项指标 · 熵权法客观权重</div>
+    <h1>🥗 膳食食谱 · 综合评价系统</h1>
+    <p>氨基酸评分 | 钙 | 铁 | 锌 | 维生素A | 维生素B₁ | 维生素B₂ | 维生素C</p>
+    <div class="sub">✅ 数据来自您提供的图片 &nbsp;|&nbsp; ⚖️ 默认权重 = 熵权法计算结果 &nbsp;|&nbsp; 🎚️ 可自由调节权重，实时对比</div>
+  </div>
+
+  <div class="weight-panel">
+    <div class="weight-title">
+      🎚️ 自定义评价权重（总和自动归一化为100%）
+      <button id="resetWeightsBtn">恢复熵权法默认权重</button>
+    </div>
+    <div class="slider-group" id="weightSliders"></div>
+    <div class="norm-info">
+      📐 评分逻辑：<strong>氨基酸评分</strong>直接使用原始分数(0‑100)；<strong>微量营养素</strong>得分 = min(100, 实际摄入量 / 性别RNI × 100)。<br>
+      RNI标准：钙800mg，铁(男12/女20mg)，锌(男12.5/女7.5mg)，VA(男800/女700μg)，VB₁(男1.4/女1.2mg)，VB₂(男1.4/女1.2mg)，VC 100mg。<br>
+      💡 综合得分 = Σ(指标得分 × 权重%)，权重滑块实时影响。
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>📊 综合得分对比 (加权总分)</h3>
+      <canvas id="compScoreChart" width="400" height="280"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>🧬 八项指标得分归一化热力对比</h3>
+      <canvas id="radarChart" width="400" height="280"></canvas>
+      <div style="font-size:0.7rem; color:#5b7553; margin-top: 8px;">* 指标得分均为0‑100分，便于跨指标比较。</div>
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <table id="rankingTable">
+      <thead>
+      <tr><th>排名</th><th>优化目标 · 性别</th><th>综合得分</th>
+        <th>氨基酸评分</th><th>钙%</th><th>铁%</th><th>锌%</th><th>VA%</th><th>VB₁%</th><th>VB₂%</th><th>VC%</th>
+        <th>食物种类数</th>
+      </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+  <div class="footnote">
+    🔍 数据来源：您提供的“氨基酸评分最大、费用最小、兼顾”六个方案。<br>
+    📌 熵权法权重（默认）：维生素C 56.61%｜维生素A 16.66%｜维生素B₂ 10.68%｜锌 4.85%｜钙 3.17%｜氨基酸评分 2.79%｜铁 2.62%｜维生素B₁ 2.62%。<br>
+    ⚡ 所有指标均为正向指标，得分越高代表营养质量越优。
+  </div>
+</div>
+<script>
+ const recipesRaw = [
+    { id:0, target:"氨基酸评分最大", gender:"男", values:[98.7, 447, 19, 11, 576, 1.23, 1.45, 154], foodTypes:15 },
+    { id:1, target:"氨基酸评分最大", gender:"女", values:[96.2, 278, 15, 8,  470, 1.00, 0.99, 65],  foodTypes:18 },
+    { id:2, target:"费用最小",       gender:"男", values:[65.0, 342, 15, 7,  178, 0.96, 0.55, 25],  foodTypes:15 },
+    { id:3, target:"费用最小",       gender:"女", values:[75.2, 433, 12, 6,  580, 0.91, 0.78, 53],  foodTypes:15 },
+    { id:4, target:"兼顾(氨基酸+经济)", gender:"男", values:[93.8, 423, 13, 8,  462, 1.07, 0.95, 17], foodTypes:15 },
+    { id:5, target:"兼顾(氨基酸+经济)", gender:"女", values:[97.4, 427, 15, 6.8,283, 0.76, 0.80, 61], foodTypes:16 }];
+  const rni = {
+    male:   { ca:800, fe:12, zn:12.5, va:800, vb1:1.4, vb2:1.4, vc:100 },
+    female: { ca:800, fe:20, zn:7.5,  va:700, vb1:1.2, vb2:1.2, vc:100 }};
+  const indicatorNames = ["氨基酸评分", "钙", "铁", "锌", "维生素A", "维生素B1", "维生素B2", "维生素C"];
+  const defaultWeights = {
+    "氨基酸评分": 2.79,
+    "钙": 3.17,
+    "铁": 2.62,
+    "锌": 4.85,
+    "维生素A": 16.66,
+    "维生素B1": 2.62,
+    "维生素B2": 10.68,
+    "维生素C": 56.61};
+  const weightKeys = ["氨基酸评分","钙","铁","锌","维生素A","维生素B1","维生素B2","维生素C"];
+  function getIndicatorScore(indicator, rawValue, gender) {
+    if (indicator === "氨基酸评分") {
+      return Math.min(100, Math.max(0, rawValue)); // 原始值已经0-100区间}
+    const r = rni[gender];
+    let target = 0;
+    switch(indicator) {
+      case "钙": target = r.ca; break;
+      case "铁": target = r.fe; break;
+      case "锌": target = r.zn; break;
+      case "维生素A": target = r.va; break;
+      case "维生素B1": target = r.vb1; break;
+      case "维生素B2": target = r.vb2; break;
+      case "维生素C": target = r.vc; break;
+      default: return 0;}
+    let ratio = rawValue / target;
+    return Math.min(100, ratio * 100);}
+  function getAllScores(recipe) {
+    const genderKey = recipe.gender === "男" ? "male" : "female";
+    const rawVals = recipe.values;
+    let scores = [];
+    for (let i = 0; i < weightKeys.length; i++) {
+      let indicator = weightKeys[i];
+      let score = getIndicatorScore(indicator, rawVals[i], genderKey);
+      scores.push(score);}
+    return scores; }
+  function computeTotalScore(scores, weights) {
+    let total = 0;
+    for (let i = 0; i < scores.length; i++) {
+      total += scores[i] * (weights[weightKeys[i]] / 100);}
+    return Math.round(total * 100) / 100;}
+  let currentWeights = { ...defaultWeights };
+  let chartComp = null;
+  let chartRadar = null;
+  function updateAllChartsAndTable() {
+    const labels = recipesRaw.map(r => `${r.target}·${r.gender}`);
+    const allScores = recipesRaw.map(r => getAllScores(r));
+    const totalScores = recipesRaw.map((r, idx) => computeTotalScore(allScores[idx], currentWeights));
+    if (chartComp) chartComp.destroy();
+    const ctxComp = document.getElementById('compScoreChart').getContext('2d');
+    chartComp = new Chart(ctxComp, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: '综合得分 (加权总分)', data: totalScores, backgroundColor: '#3d8f40', borderRadius: 8 }] },
+      options: { responsive: true, maintainAspectRatio: true, scales: { y: { min: 0, max: 100, title: { display: true, text: '得分' } } } }});
+    if (chartRadar) chartRadar.destroy();
+    const ctxRadar = document.getElementById('radarChart').getContext('2d');
+    const datasets = recipesRaw.map((r, idx) => ({
+      label: `${r.target}·${r.gender}`,
+      data: allScores[idx],
+      borderWidth: 1.5,
+      fill: false,
+      tension: 0.1,
+      borderColor: `hsl(${idx * 60}, 70%, 50%)`,
+      pointRadius: 3
+    }));
+    chartRadar = new Chart(ctxRadar, {
+      type: 'radar',
+      data: { labels: weightKeys, datasets },
+      options: { responsive: true, maintainAspectRatio: true, scales: { r: { min: 0, max: 100, ticks: { stepSize: 20 } } } }
+    });
+    const results = recipesRaw.map((r, idx) => ({ recipe: r, total: totalScores[idx], scores: allScores[idx] }));
+    results.sort((a,b) => b.total - a.total);
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    for (let i = 0; i < results.length; i++) {
+      const item = results[i];
+      const r = item.recipe;
+      const sc = item.scores;
+      const row = tbody.insertRow();
+      row.insertCell(0).innerText = i+1;
+      row.insertCell(1).innerText = `${r.target} · ${r.gender}`;
+      row.insertCell(2).innerHTML = `<span class="score-highlight">${item.total.toFixed(1)}</span>`;
+      for (let s of sc) row.insertCell(3 + sc.indexOf(s)).innerText = Math.round(s);
+      row.insertCell(11).innerText = r.foodTypes;}}
+  function buildWeightSliders() {
+    const container = document.getElementById('weightSliders');
+    container.innerHTML = '';
+    for (let key of weightKeys) {
+      const div = document.createElement('div'); div.className = 'slider-item';
+      const label = document.createElement('label'); label.innerText = key;
+      const input = document.createElement('input'); input.type = 'range'; input.min = 0; input.max = 100; input.step = 0.5;
+      input.value = currentWeights[key];
+      const valueSpan = document.createElement('span'); valueSpan.className = 'weight-value'; valueSpan.innerText = `${currentWeights[key]}%`;
+      input.addEventListener('input', (e) => {
+        let val = parseFloat(e.target.value);
+        currentWeights[key] = val;
+        valueSpan.innerText = `${val.toFixed(1)}%`;
+        normalizeWeights();
+        updateAllChartsAndTable();});
+      div.appendChild(label); div.appendChild(input); div.appendChild(valueSpan);
+      container.appendChild(div);}}
+  function normalizeWeights() {
+    let total = Object.values(currentWeights).reduce((a,b) => a+b, 0);
+    if (Math.abs(total - 100) < 0.1) return;
+    let factor = 100 / total;
+    for (let key of weightKeys) {
+      currentWeights[key] = parseFloat((currentWeights[key] * factor).toFixed(2));
+    }
+    // 因浮点误差再微调
+    let sum = Object.values(currentWeights).reduce((a,b)=>a+b,0);
+    if (Math.abs(sum - 100) > 0.01) currentWeights[weightKeys[0]] += (100 - sum);
+    // 更新滑块显示
+    for (let i=0; i<weightKeys.length; i++) {
+      let key = weightKeys[i];
+      let slider = document.querySelectorAll('#weightSliders .slider-item input')[i];
+      let span = document.querySelectorAll('#weightSliders .slider-item .weight-value')[i];
+      if (slider) slider.value = currentWeights[key];
+      if (span) span.innerText = `${currentWeights[key].toFixed(1)}%`;}}
+  function resetWeights() {
+    currentWeights = { ...defaultWeights };
+    normalizeWeights(); // 保证和为100
+    updateAllChartsAndTable();
+    // 更新滑块显示
+    for (let i=0; i<weightKeys.length; i++) {
+      let key = weightKeys[i];
+      let slider = document.querySelectorAll('#weightSliders .slider-item input')[i];
+      let span = document.querySelectorAll('#weightSliders .slider-item .weight-value')[i];
+      if (slider) slider.value = currentWeights[key];
+      if (span) span.innerText = `${currentWeights[key].toFixed(1)}%`;}}
+  buildWeightSliders();
+  normalizeWeights();
+  updateAllChartsAndTable();
+  document.getElementById('resetWeightsBtn').addEventListener('click', resetWeights);
+</script>
+</body>
+</html>
