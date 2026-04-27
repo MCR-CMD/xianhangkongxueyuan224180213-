@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>膳食食谱 · 综合评价系统 | 基于熵权法的8项指标</title>
+  <title>膳食食谱 · 综合评价系统 | 基于熵权法的8项指标（最新权重）</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; font-family: system-ui, 'Segoe UI', 'PingFang SC', Roboto, sans-serif; }
@@ -38,10 +38,10 @@
 <body>
 <div class="container">
   <div class="banner">
-    <div class="badge">📊 基于8项指标 · 熵权法客观权重</div>
+    <div class="badge">📊 基于8项指标 · 熵权法客观权重（最新）</div>
     <h1>🥗 膳食食谱 · 综合评价系统</h1>
     <p>氨基酸评分 | 钙 | 铁 | 锌 | 维生素A | 维生素B₁ | 维生素B₂ | 维生素C</p>
-    <div class="sub">✅ 数据来自您提供的图片 &nbsp;|&nbsp; ⚖️ 默认权重 = 熵权法计算结果 &nbsp;|&nbsp; 🎚️ 可自由调节权重，实时对比</div>
+    <div class="sub">✅ 数据来自您提供的图片 &nbsp;|&nbsp; ⚖️ 默认权重 = 熵权法计算结果（2026-04-26更新）&nbsp;|&nbsp; 🎚️ 可自由调节权重，实时对比</div>
   </div>
 
   <div class="weight-panel">
@@ -63,7 +63,7 @@
       <canvas id="compScoreChart" width="400" height="280"></canvas>
     </div>
     <div class="chart-card">
-      <h3>🧬 八项指标得分归一化热力对比</h3>
+      <h3>🧬 八项指标得分雷达图</h3>
       <canvas id="radarChart" width="400" height="280"></canvas>
       <div style="font-size:0.7rem; color:#5b7553; margin-top: 8px;">* 指标得分均为0‑100分，便于跨指标比较。</div>
     </div>
@@ -72,45 +72,60 @@
   <div class="table-wrapper">
     <table id="rankingTable">
       <thead>
-      <tr><th>排名</th><th>优化目标 · 性别</th><th>综合得分</th>
-        <th>氨基酸评分</th><th>钙%</th><th>铁%</th><th>锌%</th><th>VA%</th><th>VB₁%</th><th>VB₂%</th><th>VC%</th>
-        <th>食物种类数</th>
-      </tr>
+        <tr><th>排名</th><th>优化目标 · 性别</th><th>综合得分</th>
+            <th>氨基酸评分</th><th>钙%</th><th>铁%</th><th>锌%</th><th>VA%</th><th>VB₁%</th><th>VB₂%</th><th>VC%</th>
+            <th>食物种类数</th>
+        </tr>
       </thead>
       <tbody id="tableBody"></tbody>
     </table>
   </div>
   <div class="footnote">
     🔍 数据来源：您提供的“氨基酸评分最大、费用最小、兼顾”六个方案。<br>
-    📌 熵权法权重（默认）：维生素C 56.61%｜维生素A 16.66%｜维生素B₂ 10.68%｜锌 4.85%｜钙 3.17%｜氨基酸评分 2.79%｜铁 2.62%｜维生素B₁ 2.62%。<br>
+    📌 熵权法权重（默认，新计算）：维生素C 18.86%｜锌 15.77%｜铁 13.55%｜维生素B₂ 12.51%｜维生素B₁ 10.32%｜维生素A 10.32%｜氨基酸评分 9.71%｜钙 8.96%。<br>
     ⚡ 所有指标均为正向指标，得分越高代表营养质量越优。
   </div>
 </div>
+
 <script>
- const recipesRaw = [
+  // ----- 原始数据（完全依据您图片中的数值）-----
+  // 顺序：氨基酸评分, 钙(mg), 铁(mg), 锌(mg), 维生素A(μg), 维生素B1(mg), 维生素B2(mg), 维生素C(mg), 食物种类数
+  const recipesRaw = [
     { id:0, target:"氨基酸评分最大", gender:"男", values:[98.7, 447, 19, 11, 576, 1.23, 1.45, 154], foodTypes:15 },
     { id:1, target:"氨基酸评分最大", gender:"女", values:[96.2, 278, 15, 8,  470, 1.00, 0.99, 65],  foodTypes:18 },
     { id:2, target:"费用最小",       gender:"男", values:[65.0, 342, 15, 7,  178, 0.96, 0.55, 25],  foodTypes:15 },
     { id:3, target:"费用最小",       gender:"女", values:[75.2, 433, 12, 6,  580, 0.91, 0.78, 53],  foodTypes:15 },
     { id:4, target:"兼顾(氨基酸+经济)", gender:"男", values:[93.8, 423, 13, 8,  462, 1.07, 0.95, 17], foodTypes:15 },
-    { id:5, target:"兼顾(氨基酸+经济)", gender:"女", values:[97.4, 427, 15, 6.8,283, 0.76, 0.80, 61], foodTypes:16 }];
+    { id:5, target:"兼顾(氨基酸+经济)", gender:"女", values:[97.4, 427, 15, 6.8,283, 0.76, 0.80, 61], foodTypes:16 }
+  ];
+
+  // 性别RNI (用于计算微量营养素得分)
   const rni = {
     male:   { ca:800, fe:12, zn:12.5, va:800, vb1:1.4, vb2:1.4, vc:100 },
-    female: { ca:800, fe:20, zn:7.5,  va:700, vb1:1.2, vb2:1.2, vc:100 }};
+    female: { ca:800, fe:20, zn:7.5,  va:700, vb1:1.2, vb2:1.2, vc:100 }
+  };
+
+  // 指标名称 (顺序与values一致)
   const indicatorNames = ["氨基酸评分", "钙", "铁", "锌", "维生素A", "维生素B1", "维生素B2", "维生素C"];
+  // ***** 更新后的熵权法默认权重 (%) *****
   const defaultWeights = {
-    "氨基酸评分": 2.79,
-    "钙": 3.17,
-    "铁": 2.62,
-    "锌": 4.85,
-    "维生素A": 16.66,
-    "维生素B1": 2.62,
-    "维生素B2": 10.68,
-    "维生素C": 56.61};
+    "氨基酸评分": 9.71,
+    "钙": 8.96,
+    "铁": 13.55,
+    "锌": 15.77,
+    "维生素A": 10.32,
+    "维生素B1": 10.32,
+    "维生素B2": 12.51,
+    "维生素C": 18.86
+  };
+  // 确保权重顺序与指标匹配
   const weightKeys = ["氨基酸评分","钙","铁","锌","维生素A","维生素B1","维生素B2","维生素C"];
+
+  // ----- 计算单个指标得分 (氨基酸评分直接使用原始值，其他: min(100, 实际/RNI*100) )-----
   function getIndicatorScore(indicator, rawValue, gender) {
     if (indicator === "氨基酸评分") {
-      return Math.min(100, Math.max(0, rawValue)); // 原始值已经0-100区间}
+      return Math.min(100, Math.max(0, rawValue)); // 原始值已经0-100区间
+    }
     const r = rni[gender];
     let target = 0;
     switch(indicator) {
@@ -121,9 +136,13 @@
       case "维生素B1": target = r.vb1; break;
       case "维生素B2": target = r.vb2; break;
       case "维生素C": target = r.vc; break;
-      default: return 0;}
+      default: return 0;
+    }
     let ratio = rawValue / target;
-    return Math.min(100, ratio * 100);}
+    return Math.min(100, ratio * 100);
+  }
+
+  // 计算一个食谱的所有指标得分 (0-100数组)
   function getAllScores(recipe) {
     const genderKey = recipe.gender === "男" ? "male" : "female";
     const rawVals = recipe.values;
@@ -131,26 +150,44 @@
     for (let i = 0; i < weightKeys.length; i++) {
       let indicator = weightKeys[i];
       let score = getIndicatorScore(indicator, rawVals[i], genderKey);
-      scores.push(score);}
-    return scores; }
+      scores.push(score);
+    }
+    return scores; // 顺序与weightKeys一致
+  }
+
+  // 计算综合得分 (基于当前权重)
   function computeTotalScore(scores, weights) {
     let total = 0;
     for (let i = 0; i < scores.length; i++) {
-      total += scores[i] * (weights[weightKeys[i]] / 100);}
-    return Math.round(total * 100) / 100;}
+      total += scores[i] * (weights[weightKeys[i]] / 100);
+    }
+    return Math.round(total * 100) / 100;
+  }
+
+  // 初始化当前权重 (深拷贝默认)
   let currentWeights = { ...defaultWeights };
+
+  // ----- 全局图表变量 -----
   let chartComp = null;
   let chartRadar = null;
+
+  // 更新所有可视化 (综合得分柱状图 + 雷达图)
   function updateAllChartsAndTable() {
+    // 准备数据
     const labels = recipesRaw.map(r => `${r.target}·${r.gender}`);
     const allScores = recipesRaw.map(r => getAllScores(r));
     const totalScores = recipesRaw.map((r, idx) => computeTotalScore(allScores[idx], currentWeights));
+    
+    // 1. 综合得分柱状图
     if (chartComp) chartComp.destroy();
     const ctxComp = document.getElementById('compScoreChart').getContext('2d');
     chartComp = new Chart(ctxComp, {
       type: 'bar',
       data: { labels, datasets: [{ label: '综合得分 (加权总分)', data: totalScores, backgroundColor: '#3d8f40', borderRadius: 8 }] },
-      options: { responsive: true, maintainAspectRatio: true, scales: { y: { min: 0, max: 100, title: { display: true, text: '得分' } } } }});
+      options: { responsive: true, maintainAspectRatio: true, scales: { y: { min: 0, max: 100, title: { display: true, text: '得分' } } } }
+    });
+    
+    // 2. 雷达图：展示每个方案的8项指标得分
     if (chartRadar) chartRadar.destroy();
     const ctxRadar = document.getElementById('radarChart').getContext('2d');
     const datasets = recipesRaw.map((r, idx) => ({
@@ -167,6 +204,8 @@
       data: { labels: weightKeys, datasets },
       options: { responsive: true, maintainAspectRatio: true, scales: { r: { min: 0, max: 100, ticks: { stepSize: 20 } } } }
     });
+    
+    // 3. 表格渲染 (排名)
     const results = recipesRaw.map((r, idx) => ({ recipe: r, total: totalScores[idx], scores: allScores[idx] }));
     results.sort((a,b) => b.total - a.total);
     const tbody = document.getElementById('tableBody');
@@ -179,8 +218,14 @@
       row.insertCell(0).innerText = i+1;
       row.insertCell(1).innerText = `${r.target} · ${r.gender}`;
       row.insertCell(2).innerHTML = `<span class="score-highlight">${item.total.toFixed(1)}</span>`;
+      // 各指标得分
       for (let s of sc) row.insertCell(3 + sc.indexOf(s)).innerText = Math.round(s);
-      row.insertCell(11).innerText = r.foodTypes;}}
+      // 食物种类数
+      row.insertCell(11).innerText = r.foodTypes;
+    }
+  }
+
+  // ----- 权重滑块UI -----
   function buildWeightSliders() {
     const container = document.getElementById('weightSliders');
     container.innerHTML = '';
@@ -195,9 +240,13 @@
         currentWeights[key] = val;
         valueSpan.innerText = `${val.toFixed(1)}%`;
         normalizeWeights();
-        updateAllChartsAndTable();});
+        updateAllChartsAndTable();
+      });
       div.appendChild(label); div.appendChild(input); div.appendChild(valueSpan);
-      container.appendChild(div);}}
+      container.appendChild(div);
+    }
+  }
+  
   function normalizeWeights() {
     let total = Object.values(currentWeights).reduce((a,b) => a+b, 0);
     if (Math.abs(total - 100) < 0.1) return;
@@ -214,7 +263,10 @@
       let slider = document.querySelectorAll('#weightSliders .slider-item input')[i];
       let span = document.querySelectorAll('#weightSliders .slider-item .weight-value')[i];
       if (slider) slider.value = currentWeights[key];
-      if (span) span.innerText = `${currentWeights[key].toFixed(1)}%`;}}
+      if (span) span.innerText = `${currentWeights[key].toFixed(1)}%`;
+    }
+  }
+  
   function resetWeights() {
     currentWeights = { ...defaultWeights };
     normalizeWeights(); // 保证和为100
@@ -225,7 +277,11 @@
       let slider = document.querySelectorAll('#weightSliders .slider-item input')[i];
       let span = document.querySelectorAll('#weightSliders .slider-item .weight-value')[i];
       if (slider) slider.value = currentWeights[key];
-      if (span) span.innerText = `${currentWeights[key].toFixed(1)}%`;}}
+      if (span) span.innerText = `${currentWeights[key].toFixed(1)}%`;
+    }
+  }
+  
+  // 初始化
   buildWeightSliders();
   normalizeWeights();
   updateAllChartsAndTable();
